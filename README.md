@@ -10,6 +10,8 @@
 
 Harness the power of AWS Bedrock AI to convert natural language into SQL that can be run against the included MySQL database.
 
+![Screenshot](public/images/screenshot.gif)
+
 [Features](#features) •
 [Getting Started](#getting-started) •
 [Usage](#usage) •
