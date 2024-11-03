@@ -6,14 +6,11 @@
 
 */
 
-import { Application } from "https://deno.land/x/oak/mod.ts";
-import { Client } from "https://deno.land/x/mysql/mod.ts";
-import { Router } from "https://deno.land/x/oak/mod.ts";
-import {
-  BedrockAgentRuntimeClient,
-  InvokeFlowCommand,
-} from "npm:@aws-sdk/client-bedrock-agent-runtime";
-import { bold, gray, white } from "https://deno.land/std@0.224.0/fmt/colors.ts";
+import { Application } from 'https://deno.land/x/oak/mod.ts';
+import { Client } from 'https://deno.land/x/mysql/mod.ts';
+import { Router } from 'https://deno.land/x/oak/mod.ts';
+import { BedrockAgentRuntimeClient, InvokeFlowCommand } from 'npm:@aws-sdk/client-bedrock-agent-runtime';
+import { bold, gray, white } from 'https://deno.land/std@0.224.0/fmt/colors.ts';
 
 /*
   ___ _  ___   __ __   ___   ___  ___
@@ -24,17 +21,17 @@ import { bold, gray, white } from "https://deno.land/std@0.224.0/fmt/colors.ts";
 */
 
 // read this first for logging
-const debug: boolean = Deno.env.get("DEBUG")?.toLowerCase() === "true";
+const debug: boolean = Deno.env.get('DEBUG')?.toLowerCase() === 'true';
 log(`Debug mode set to '${debug}'`, true); // aways log this line
 
-const awsAccessKey: string | undefined = Deno.env.get("AWS_ACCESS_KEY_ID");
-log(`AWS_ACCESS_KEY_ID set to  '${awsAccessKey?.substring(0, 6)}.....'`, false);
+const awsAccessKey: string | undefined = Deno.env.get('AWS_ACCESS_KEY_ID');
+log(`AWS_ACCESS_KEY_ID set to '${awsAccessKey}'`, false);
 
-const awsRegion: string | undefined = Deno.env.get("AWS_REGION");
-log(`AWS_REGION set to  '${awsRegion}'`, false);
+const awsRegion: string | undefined = Deno.env.get('AWS_REGION');
+log(`AWS_REGION set to '${awsRegion}'`, false);
 
 const awsSecretAccessKey: string | undefined = Deno.env.get(
-  "AWS_SECRET_ACCESS_KEY",
+  'AWS_SECRET_ACCESS_KEY',
 );
 log(
   `AWS_SECRET_ACCESS_KEY set to  '${awsSecretAccessKey?.substring(0, 6)}.....'`,
@@ -42,28 +39,40 @@ log(
 );
 
 const flowAliasIdentifier: string | undefined = Deno.env.get(
-  "AWS_BEDROCK_FLOW_ALIAS_IDENTIFIER",
+  'AWS_BEDROCK_FLOW_ALIAS_IDENTIFIER',
 );
 log(
   `AWS_BEDROCK_FLOW_ALIAS_IDENTIFIER set to '${
-    flowAliasIdentifier?.substring(0, 6)
+    flowAliasIdentifier?.substring(
+      0,
+      6,
+    )
   }.....'`,
   false,
 );
 
 const flowIdentifier: string | undefined = Deno.env.get(
-  "AWS_BEDROCK_FLOW_IDENTIFIER",
+  'AWS_BEDROCK_FLOW_IDENTIFIER',
 );
 log(
   `AWS_BEDROCK_FLOW_IDENTIFIER set to '${
-    flowIdentifier?.substring(0, 6)
+    flowIdentifier?.substring(
+      0,
+      6,
+    )
   }.....'`,
   false,
 );
 
 // Add after env var declarations
-if (!awsAccessKey || !awsSecretAccessKey || !awsRegion || !flowIdentifier || !flowAliasIdentifier) {
-  console.error("Missing required environment variables");
+if (
+  !awsAccessKey ||
+  !awsSecretAccessKey ||
+  !awsRegion ||
+  !flowIdentifier ||
+  !flowAliasIdentifier
+) {
+  console.error('Missing required environment variables');
   Deno.exit(1);
 }
 
@@ -87,10 +96,10 @@ const bedrock_client = new BedrockAgentRuntimeClient({
 
 // Database connection
 const db_client = await new Client().connect({
-  hostname: "db",
-  username: "root",
-  password: "rootpassword",
-  db: "myapp",
+  hostname: 'db',
+  username: 'root',
+  password: 'rootpassword',
+  db: 'myapp',
 });
 
 const router = new Router();
@@ -107,10 +116,41 @@ const router = new Router();
 */
 
 function checkAiSqlForError(sql: string) {
-  return sql.toUpperCase().startsWith("ERROR") ? 1 : 0;
+  return sql.toUpperCase().startsWith('ERROR') ? 1 : 0;
+}
+
+async function insertAuditLogRow(
+  question: string,
+  mysql: string,
+  succeeded: boolean,
+  execAIStart: number,
+  execAIEnd: number,
+) {
+  try {
+    const t1 = new Date(execAIStart);
+    const t2 = new Date(execAIEnd);
+    const result = await db_client.execute(
+      `INSERT INTO AuditLog (awsAccessKey, awsRegion, flowIdentifier, flowAliasIdentifier, question, mysql, succeeded, execAIStart, execAIEnd, execAIElapsed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        awsAccessKey,
+        awsRegion,
+        flowIdentifier,
+        flowAliasIdentifier,
+        question,
+        mysql,
+        succeeded,
+        t1,
+        t2,
+        execAIEnd - execAIStart,
+      ],
+    );
+  } catch (error) {
+    console.log(error);
+  }
 }
 
 async function invokeFlow(
+  question: string,
   flowIdentifier: string | undefined,
   flowAliasIdentifier: string | undefined,
   inputs: any[],
@@ -121,11 +161,14 @@ async function invokeFlow(
     inputs,
   });
 
-  let rval = "";
+  let mysql = '';
+  let hasError = false;
 
   try {
     let flowResponse: any = {};
+    const execAIStart = Date.now();
     const response = await bedrock_client.send(command);
+    const execAIEnd = Date.now();
 
     if (response && response.responseStream) {
       for await (const chunkEvent of response.responseStream) {
@@ -133,36 +176,42 @@ async function invokeFlow(
 
         if (flowOutputEvent) {
           flowResponse = { ...flowResponse, ...flowOutputEvent };
-          rval = flowResponse?.content?.document;
-          log(`Generated SQL = '${rval}'`, false);
+          mysql = flowResponse?.content?.document;
+          log(`Generated SQL = '${mysql}'`, false);
+          hasError = checkAiSqlForError(mysql);
+          insertAuditLogRow(question, mysql, !hasError, execAIStart, execAIEnd);
         } else if (flowCompletionEvent) {
-          if (flowCompletionEvent.completionReason == "SUCCESS") {
+          if (flowCompletionEvent.completionReason == 'SUCCESS') {
             log(`flowCompletionEvent: Success`, false);
           } else {
-            log(`flowCompletionEvent: ${flowCompletionEvent}`, true);
+            //log(`flowCompletionEvent: ${flowCompletionEvent}`, true);
           }
         }
       }
     }
-    return rval;
+    return [mysql, hasError];
   } catch (error) {
     log(`Error invoking flow: '${error}'`, true);
     throw error;
   }
 }
 
-function log(msg: string, critical: boolean) {
+function log(msg: string | object, critical: boolean) {
   // when critical is 'true' msg will always be displayed
   // otherwise msg is only displayed if debug is true
 
   try {
-    if (critical) {
-      console.log(`${bold(white("LOG:"))} ${bold(msg)}`);
-    } else if (debug) {
-      console.log(`${bold(white("LOG:"))} ${gray(msg)}`);
+    if (typeof msg === 'object') {
+      console.log(msg);
+    } else {
+      if (critical) {
+        console.log(`${bold(white('LOG:'))} ${bold(msg)}`);
+      } else if (debug) {
+        console.log(`${bold(white('LOG:'))} ${gray(msg)}`);
+      }
     }
   } catch (error) {
-    console.error("Error in logging: ", error);
+    console.error(error);
   }
 }
 
@@ -171,10 +220,10 @@ async function runSQL(sql: string) {
 
   try {
     const result = await db_client.query(sql);
-    log(result, false);
+    log(JSON.stringify(result), false);
     return result;
   } catch (error) {
-    log(error, true);
+    console.error(error);
     return error;
   }
 }
@@ -192,35 +241,39 @@ app.use(async (ctx, next) => {
   try {
     await ctx.send({
       root: `${Deno.cwd()}/public`,
-      index: "index.html",
+      index: 'index.html',
     });
   } catch (error) {
-    log(error, true);
+    console.log(error);
     await next();
   }
 });
 
 // route to convert question to SQL
-router.post("/txt2sql", async (ctx) => {
+router.post('/txt2sql', async (ctx) => {
   try {
     const json = await ctx.request.body.json();
-    
+
     if (!json.question) {
       ctx.response.status = 400;
-      ctx.response.body = { error: "Question is required" };
+      ctx.response.body = { error: 'Question is required' };
       return;
     }
 
     const inputs = [
       {
         content: { document: json.question },
-        nodeName: "FlowInputNode",
-        nodeOutputName: "document",
+        nodeName: 'FlowInputNode',
+        nodeOutputName: 'document',
       },
     ];
 
-    const sql = await invokeFlow(flowIdentifier, flowAliasIdentifier, inputs);
-    const hasError = checkAiSqlForError(sql);
+    const [sql, hasError] = await invokeFlow(
+      json.question,
+      flowIdentifier,
+      flowAliasIdentifier,
+      inputs,
+    );
 
     if (hasError) {
       log(`SQL not generated`, false);
@@ -234,12 +287,12 @@ router.post("/txt2sql", async (ctx) => {
   } catch (error) {
     log(`Error in /txt2sql: ${error}`, true);
     ctx.response.status = 500;
-    ctx.response.body = { error: "Internal server error" };
+    ctx.response.body = { error: 'Internal server error' };
   }
 });
 
 // route to run SQL
-router.post("/sql", async (ctx) => {
+router.post('/sql', async (ctx) => {
   const json = await ctx.request.body.json();
 
   const result = await runSQL(json.sql);
@@ -258,5 +311,5 @@ router.post("/sql", async (ctx) => {
 app.use(router.routes());
 app.use(router.allowedMethods());
 
-log("Server running on http://localhost:8000\n", true);
+log('Server running on http://localhost:8000\n', true);
 await app.listen({ port: 8000 });

@@ -35,3 +35,18 @@ CREATE TABLE IF NOT EXISTS StudentYear
      CONSTRAINT fk_studentyear_student FOREIGN KEY (studentid) REFERENCES Student(studentid)
  )
 engine=innodb;
+
+CREATE TABLE IF NOT EXISTS AuditLog (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    awsAccessKey VARCHAR(50),
+    awsRegion VARCHAR(50),
+    flowIdentifier VARCHAR(50),
+    flowAliasIdentifier VARCHAR(50),
+    question VARCHAR(2000),
+    mysql VARCHAR(2000),
+    succeeded BOOLEAN,
+    execAIStart DATETIME,
+    execAIEnd DATETIME,
+    execAIElapsed BIGINT
+)
+engine=innodb;
