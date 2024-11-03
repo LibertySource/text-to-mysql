@@ -116,7 +116,7 @@ const router = new Router();
 */
 
 function checkAiSqlForError(sql: string) {
-  return sql.toUpperCase().startsWith('ERROR') ? 1 : 0;
+  return sql.toUpperCase().startsWith('ERROR') ? true : false;
 }
 
 async function insertAuditLogRow(
@@ -129,7 +129,7 @@ async function insertAuditLogRow(
   try {
     const t1 = new Date(execAIStart);
     const t2 = new Date(execAIEnd);
-    const result = await db_client.execute(
+    await db_client.execute(
       `INSERT INTO AuditLog (awsAccessKey, awsRegion, flowIdentifier, flowAliasIdentifier, question, mysql, succeeded, execAIStart, execAIEnd, execAIElapsed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         awsAccessKey,
@@ -153,6 +153,7 @@ async function invokeFlow(
   question: string,
   flowIdentifier: string | undefined,
   flowAliasIdentifier: string | undefined,
+  // deno-lint-ignore no-explicit-any
   inputs: any[],
 ) {
   const command = new InvokeFlowCommand({
@@ -161,10 +162,11 @@ async function invokeFlow(
     inputs,
   });
 
-  let mysql = '';
+  let mysql: string = '';
   let hasError = false;
 
   try {
+    // deno-lint-ignore no-explicit-any
     let flowResponse: any = {};
     const execAIStart = Date.now();
     const response = await bedrock_client.send(command);
@@ -215,11 +217,11 @@ function log(msg: string | object, critical: boolean) {
   }
 }
 
-async function runSQL(sql: string) {
-  log(`Running: '${sql}'`, false);
+async function runSQL(mysql: string) {
+  log(`Running: '${mysql}'`, false);
 
   try {
-    const result = await db_client.query(sql);
+    const result = await db_client.query(mysql);
     log(JSON.stringify(result), false);
     return result;
   } catch (error) {
@@ -268,7 +270,7 @@ router.post('/txt2sql', async (ctx) => {
       },
     ];
 
-    const [sql, hasError] = await invokeFlow(
+    const [mysql, hasError] = await invokeFlow(
       json.question,
       flowIdentifier,
       flowAliasIdentifier,
@@ -277,12 +279,12 @@ router.post('/txt2sql', async (ctx) => {
 
     if (hasError) {
       log(`SQL not generated`, false);
-      ctx.response.body = { sql, dbResult: null };
+      ctx.response.body = { mysql, dbResult: null };
     } else if (json.autoRun) {
-      const dbResult = await runSQL(sql);
-      ctx.response.body = { sql, dbResult };
+      const dbResult = await runSQL(mysql.toString());
+      ctx.response.body = { mysql, dbResult };
     } else {
-      ctx.response.body = { sql, dbResult: null };
+      ctx.response.body = { mysql, dbResult: null };
     }
   } catch (error) {
     log(`Error in /txt2sql: ${error}`, true);
