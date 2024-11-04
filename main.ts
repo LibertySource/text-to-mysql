@@ -80,7 +80,7 @@ if (
    ___ ___  _  _ ___ _____ _   _  _ _____ ___
   / __/ _ \| \| / __|_   _/_\ | \| |_   _/ __|
  | (_| (_) | .` \__ \ | |/ _ \| .` | | | \__ \
-  \___\___/|_|\_|___/ |_/_/ \_\_|\_| |_| |___/
+ \___\___/|_|\_|___/ |_/_/ \_\_|\_| |_| |___/
 
 */
 
@@ -117,6 +117,15 @@ const router = new Router();
 
 function checkAiSqlForError(sql: string) {
   return sql.toUpperCase().startsWith('ERROR') ? true : false;
+}
+
+async function getAuditLogRows() {
+  const results = await db_client.query(
+    'select question, mysql from ?? order by execAIStart desc',
+    ['AuditLog'],
+  );
+
+  return results;
 }
 
 async function insertAuditLogRow(
@@ -248,6 +257,30 @@ app.use(async (ctx, next) => {
   } catch (error) {
     console.log(error);
     await next();
+  }
+});
+
+router.get('/audit', async (ctx) => {
+  try {
+    await ctx.send({
+      root: `${Deno.cwd()}/public`,
+      index: 'audit.html',
+    });
+  } catch (error) {
+    console.log(error);
+  }
+});
+
+router.get('/audit-api', async (ctx) => {
+  try {
+    const data = await getAuditLogRows();
+
+    ctx.response.status = 200;
+    ctx.response.headers.set('Content-Type', 'application/json');
+    ctx.response.body = JSON.stringify(data);
+    return;
+  } catch (error) {
+    console.log(error);
   }
 });
 
