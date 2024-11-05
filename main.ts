@@ -115,8 +115,8 @@ const router = new Router();
 
 */
 
-function checkAiSqlForError(sql: string) {
-  return sql.toUpperCase().startsWith('ERROR') ? true : false;
+function getAIStatus(sql: string) {
+  return sql.toUpperCase().startsWith('ERROR') ? false : true;
 }
 
 async function getAuditLogRows() {
@@ -124,7 +124,8 @@ async function getAuditLogRows() {
     `SELECT 
         question,
         mysql,
-        succeeded,
+        aiStatus,
+        mysqlStatus,
         ROUND(execAIElapsed / 1000.0, 3) AS execSeconds
         FROM ?? 
         ORDER BY execAIStart DESC
@@ -138,7 +139,8 @@ async function getAuditLogRows() {
 async function insertAuditLogRow(
   question: string,
   mysql: string,
-  succeeded: boolean,
+  aiStatus: boolean,
+  mysqlStatus: boolean,
   execAIStart: number,
   execAIEnd: number,
 ) {
@@ -146,7 +148,9 @@ async function insertAuditLogRow(
     const t1 = new Date(execAIStart);
     const t2 = new Date(execAIEnd);
     await db_client.execute(
-      `INSERT INTO AuditLog (awsAccessKey, awsRegion, flowIdentifier, flowAliasIdentifier, question, mysql, succeeded, execAIStart, execAIEnd, execAIElapsed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO AuditLog (awsAccessKey, awsRegion, flowIdentifier, 
+        flowAliasIdentifier, question, mysql, aiStatus, mysqlStatus, 
+        execAIStart, execAIEnd, execAIElapsed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         awsAccessKey,
         awsRegion,
@@ -154,14 +158,15 @@ async function insertAuditLogRow(
         flowAliasIdentifier,
         question,
         mysql,
-        succeeded,
+        aiStatus,
+        mysqlStatus,
         t1,
         t2,
         execAIEnd - execAIStart,
       ],
     );
   } catch (error) {
-    console.log(error);
+    console.error(error);
   }
 }
 
@@ -169,9 +174,15 @@ async function invokeFlow(
   question: string,
   flowIdentifier: string | undefined,
   flowAliasIdentifier: string | undefined,
-  // deno-lint-ignore no-explicit-any
-  inputs: any[],
 ) {
+  const inputs = [
+      {
+        content: { document: question },
+        nodeName: 'FlowInputNode',
+        nodeOutputName: 'document',
+      },
+  ];
+
   const command = new InvokeFlowCommand({
     flowIdentifier,
     flowAliasIdentifier,
@@ -179,14 +190,11 @@ async function invokeFlow(
   });
 
   let mysql: string = '';
-  let hasError = false;
 
   try {
     // deno-lint-ignore no-explicit-any
     let flowResponse: any = {};
-    const execAIStart = Date.now();
     const response = await bedrock_client.send(command);
-    const execAIEnd = Date.now();
 
     if (response && response.responseStream) {
       for await (const chunkEvent of response.responseStream) {
@@ -195,9 +203,8 @@ async function invokeFlow(
         if (flowOutputEvent) {
           flowResponse = { ...flowResponse, ...flowOutputEvent };
           mysql = flowResponse?.content?.document;
+          log(`Question = '${question}'`, false);
           log(`Generated SQL = '${mysql}'`, false);
-          hasError = checkAiSqlForError(mysql);
-          insertAuditLogRow(question, mysql, !hasError, execAIStart, execAIEnd);
         } else if (flowCompletionEvent) {
           if (flowCompletionEvent.completionReason == 'SUCCESS') {
             log(`flowCompletionEvent: Success`, false);
@@ -207,11 +214,11 @@ async function invokeFlow(
         }
       }
     }
-    return [mysql, hasError];
   } catch (error) {
-    log(`Error invoking flow: '${error}'`, true);
-    throw error;
+    console.error(error);
   }
+
+  return mysql;
 }
 
 function log(msg: string | object, critical: boolean) {
@@ -244,7 +251,7 @@ async function runSQL(mysql: string) {
   } catch (error) {
     success = false;
     console.error(error);
-    return [error, success];
+    return [`${error}`, success];
   }
 }
 
@@ -264,7 +271,7 @@ app.use(async (ctx, next) => {
       index: 'index.html',
     });
   } catch (error) {
-    console.log(error);
+    console.error(error);
     await next();
   }
 });
@@ -276,7 +283,7 @@ router.get('/audit', async (ctx) => {
       index: 'audit.html',
     });
   } catch (error) {
-    console.log(error);
+    console.error(error);
   }
 });
 
@@ -289,13 +296,16 @@ router.get('/audit-api', async (ctx) => {
     ctx.response.body = JSON.stringify(data);
     return;
   } catch (error) {
-    console.log(error);
+    console.error(error);
   }
 });
 
 // route to convert question to SQL
 router.post('/txt2sql', async (ctx) => {
   try {
+    // deno-lint-ignore no-explicit-any
+    let dbResult: Promise<any> | string | null = null;
+    let mysqlStatus: boolean = true;
     const json = await ctx.request.body.json();
 
     if (!json.question) {
@@ -304,32 +314,27 @@ router.post('/txt2sql', async (ctx) => {
       return;
     }
 
-    const inputs = [
-      {
-        content: { document: json.question },
-        nodeName: 'FlowInputNode',
-        nodeOutputName: 'document',
-      },
-    ];
-
-    const [mysql, hasError] = await invokeFlow(
+    const execAIStart = Date.now();
+    const mysql = await invokeFlow(
       json.question,
       flowIdentifier,
       flowAliasIdentifier,
-      inputs,
     );
+    const execAIEnd = Date.now();
 
-    if (hasError) {
+    const aiStatus = getAIStatus(mysql);
+
+    if (!aiStatus) {
       log(`SQL not generated`, false);
-      ctx.response.body = { mysql, dbResult: null };
     } else if (json.autoRun) {
-      const [dbResult, success] = await runSQL(mysql.toString());
-      ctx.response.body = { mysql, dbResult };
-    } else {
-      ctx.response.body = { mysql, dbResult: null };
+       [dbResult, mysqlStatus] = await runSQL(mysql.toString());
     }
+
+    insertAuditLogRow(json.question, mysql, aiStatus, mysqlStatus, execAIStart, execAIEnd);
+
+    ctx.response.body = { mysql, dbResult, success: aiStatus && mysqlStatus };
   } catch (error) {
-    log(`Error in /txt2sql: ${error}`, true);
+    console.error(error);
     ctx.response.status = 500;
     ctx.response.body = { error: 'Internal server error' };
   }

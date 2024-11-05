@@ -44,7 +44,8 @@ CREATE TABLE IF NOT EXISTS AuditLog (
     flowAliasIdentifier VARCHAR(50),
     question VARCHAR(2000),
     mysql VARCHAR(2000),
-    succeeded BOOLEAN,
+    aiStatus BOOLEAN,
+    mysqlStatus BOOLEAN,
     execAIStart DATETIME,
     execAIEnd DATETIME,
     execAIElapsed BIGINT

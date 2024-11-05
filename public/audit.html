@@ -10,6 +10,19 @@
     <script src="https://unpkg.com/ag-grid-community/dist/ag-grid-community.min.noStyle.js"></script>
     <link rel="stylesheet" href="css/ag-grid.css" />
     <link rel="stylesheet" href="css/ag-theme-alpine.css" />
+    <style>
+      .statusSpan {
+        display: flex;
+        justify-content: center;
+        height: 100%;
+        align-items: center;
+      }
+
+      .statusIcon {
+        width: auto;
+        height: auto;
+      }
+    </style>
   </head>
   <body>
     <p>
@@ -18,7 +31,7 @@
     <div id="myGrid" class="ag-theme-alpine" style="height: 500px"></div>
 
     <script>
-      class MissionResultRenderer {
+      class StatusResultRenderer {
         eGui;
 
         // Optional: Params for rendering. The same params that are passed to the cellRenderer function.
@@ -27,10 +40,10 @@
           icon.src = `https://www.ag-grid.com/example-assets/icons/${
             params.value ? 'tick-in-circle' : 'cross-in-circle'
           }.png`;
-          icon.setAttribute('class', 'missionIcon');
+          icon.setAttribute('class', 'StatusIcon');
 
           this.eGui = document.createElement('span');
-          this.eGui.setAttribute('class', 'missionSpan');
+          this.eGui.setAttribute('class', 'statusSpan');
           this.eGui.appendChild(icon);
         }
 
@@ -50,8 +63,9 @@
         const gridOptions = {
           columnDefs: [
             { field: 'question', minWidth: 450 },
-            { field: 'mysql', minWidth: 500 },
-            { headerName: 'Valid', field: 'succeeded', maxWidth: 75, cellRenderer: MissionResultRenderer },
+            { headerName: 'MySQL', field: 'mysql', minWidth: 500 },
+            { headerName: 'AI Status', field: 'aiStatus', maxWidth: 150, cellRenderer: StatusResultRenderer },
+            { headerName: 'MySQL Status', field: 'mysqlStatus', maxWidth: 150, cellRenderer: StatusResultRenderer },
             { headerName: 'Secs', field: 'execSeconds', type: 'numericColumn', maxWidth: 80 },
           ],
           rowData: [],
