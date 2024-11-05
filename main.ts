@@ -121,7 +121,14 @@ function checkAiSqlForError(sql: string) {
 
 async function getAuditLogRows() {
   const results = await db_client.query(
-    'select question, mysql from ?? order by execAIStart desc',
+    `SELECT 
+        question,
+        mysql,
+        succeeded,
+        ROUND(execAIElapsed / 1000.0, 3) AS execSeconds
+        FROM ?? 
+        ORDER BY execAIStart DESC
+      `,
     ['AuditLog'],
   );
 
@@ -227,15 +234,17 @@ function log(msg: string | object, critical: boolean) {
 }
 
 async function runSQL(mysql: string) {
+  let success = true;
   log(`Running: '${mysql}'`, false);
 
   try {
     const result = await db_client.query(mysql);
     log(JSON.stringify(result), false);
-    return result;
+    return [result, success];
   } catch (error) {
+    success = false;
     console.error(error);
-    return error;
+    return [error, success];
   }
 }
 
@@ -314,7 +323,7 @@ router.post('/txt2sql', async (ctx) => {
       log(`SQL not generated`, false);
       ctx.response.body = { mysql, dbResult: null };
     } else if (json.autoRun) {
-      const dbResult = await runSQL(mysql.toString());
+      const [dbResult, success] = await runSQL(mysql.toString());
       ctx.response.body = { mysql, dbResult };
     } else {
       ctx.response.body = { mysql, dbResult: null };
@@ -330,8 +339,8 @@ router.post('/txt2sql', async (ctx) => {
 router.post('/sql', async (ctx) => {
   const json = await ctx.request.body.json();
 
-  const result = await runSQL(json.sql);
-  ctx.response.body = { dbResult: result };
+  const [result, success] = await runSQL(json.sql);
+  ctx.response.body = { dbResult: result, success };
 });
 
 /*

@@ -13,30 +13,58 @@
   </head>
   <body>
     <p>
-        <a href="/">Home</a>
+      <a href="/">Home</a>
     </p>
     <div id="myGrid" class="ag-theme-alpine" style="height: 500px"></div>
 
     <script>
+      class MissionResultRenderer {
+        eGui;
+
+        // Optional: Params for rendering. The same params that are passed to the cellRenderer function.
+        init(params) {
+          let icon = document.createElement('img');
+          icon.src = `https://www.ag-grid.com/example-assets/icons/${
+            params.value ? 'tick-in-circle' : 'cross-in-circle'
+          }.png`;
+          icon.setAttribute('class', 'missionIcon');
+
+          this.eGui = document.createElement('span');
+          this.eGui.setAttribute('class', 'missionSpan');
+          this.eGui.appendChild(icon);
+        }
+
+        // Required: Return the DOM element of the component, this is what the grid puts into the cell
+        getGui() {
+          return this.eGui;
+        }
+
+        // Required: Get the cell to refresh.
+        refresh(params) {
+          return false;
+        }
+      }
+
       $(document).ready(function () {
         // Grid Options: Contains all of the Data Grid configurations
         const gridOptions = {
           columnDefs: [
-            { field: "question" },
-            { field: "mysql" },
+            { field: 'question', minWidth: 450 },
+            { field: 'mysql', minWidth: 500 },
+            { headerName: 'Valid', field: 'succeeded', maxWidth: 75, cellRenderer: MissionResultRenderer },
+            { headerName: 'Secs', field: 'execSeconds', type: 'numericColumn', maxWidth: 80 },
           ],
-          rowData: [
-          ],
-        }
+          rowData: [],
+        };
         // Your Javascript code to create the Data Grid
-        const myGridElement = document.querySelector("#myGrid")
-        const gridApi = agGrid.createGrid(myGridElement, gridOptions)
-        fetch("/audit-api")
+        const myGridElement = document.querySelector('#myGrid');
+        const gridApi = agGrid.createGrid(myGridElement, gridOptions);
+        fetch('/audit-api')
           .then((response) => response.json())
           .then((data) => {
-            gridApi.setGridOption('rowData', data)
-          })
-      })
+            gridApi.setGridOption('rowData', data);
+          });
+      });
     </script>
   </body>
 </html>
