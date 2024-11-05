@@ -51,3 +51,12 @@ CREATE TABLE IF NOT EXISTS AuditLog (
     execAIElapsed BIGINT
 )
 engine=innodb;
+
+CREATE TABLE IF NOT EXISTS Questions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  sortOrder INT,
+  question VARCHAR(500),
+  isValid BOOLEAN,
+  answer TEXT
+)
+engine=innodb;
