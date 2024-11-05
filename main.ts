@@ -38,6 +38,14 @@ log(
   false,
 );
 
+const dbHostname: string | undefined = Deno.env.get(
+  'DB_HOSTNAME',
+);
+log(
+  `DB_HOSTNAME set to  '${dbHostname}'`,
+  false,
+);
+
 const flowAliasIdentifier: string | undefined = Deno.env.get(
   'AWS_BEDROCK_FLOW_ALIAS_IDENTIFIER',
 );
@@ -96,7 +104,7 @@ const bedrock_client = new BedrockAgentRuntimeClient({
 
 // Database connection
 const db_client = await new Client().connect({
-  hostname: 'db',
+  hostname: dbHostname,
   username: 'root',
   password: 'rootpassword',
   db: 'myapp',
