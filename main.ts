@@ -144,6 +144,24 @@ async function getAuditLogRows() {
   return results;
 }
 
+async function getQuestionRows() {
+  const results = await db_client.query(
+    `SELECT
+        id, 
+        '' AS status,
+        question, 
+        mysql, 
+        response
+      FROM ??
+      WHERE mysql IS NOT NULL 
+      ORDER BY sortOrder; 
+      `,
+    ['Question'],
+  );
+
+  return results;
+}
+
 async function insertAuditLogRow(
   question: string,
   mysql: string,
@@ -284,20 +302,22 @@ app.use(async (ctx, next) => {
   }
 });
 
-router.get('/audit', async (ctx) => {
+router.get('/audit-api', async (ctx) => {
   try {
-    await ctx.send({
-      root: `${Deno.cwd()}/public`,
-      index: 'audit.html',
-    });
+    const data = await getAuditLogRows();
+
+    ctx.response.status = 200;
+    ctx.response.headers.set('Content-Type', 'application/json');
+    ctx.response.body = JSON.stringify(data);
+    return;
   } catch (error) {
     console.error(error);
   }
 });
 
-router.get('/audit-api', async (ctx) => {
+router.get('/test-api', async (ctx) => {
   try {
-    const data = await getAuditLogRows();
+    const data = await getQuestionRows();
 
     ctx.response.status = 200;
     ctx.response.headers.set('Content-Type', 'application/json');

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>LLM Test Page</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+        <script src="https://unpkg.com/ag-grid-community/dist/ag-grid-community.min.noStyle.js"></script>
+        <link rel="stylesheet" href="css/ag-grid.css" />
+        <link rel="stylesheet" href="css/ag-theme-alpine.css" />
+        <style>
+            .statusSpan {
+                display: flex;
+                justify-content: center;
+                height: 100%;
+                align-items: center;
+            }
+
+            .statusIcon {
+                width: auto;
+                height: auto;
+            }
+        </style>
+    </head>
+    <body class="bg-gray-100 min-h-screen p-8">
+        <h1 class="text-3xl font-bold mb-6 text-center">LLM Test Page</h1>
+
+        <div class="mx-auto">
+            <label for="llm-select" class="block text-sm font-medium text-gray-700 mb-2">Choose LLM</label>
+            <select id="llm-select" class="w-full p-2 border border-gray-300 rounded-md mb-4">
+                <option value="">Select an LLM</option>
+            </select>
+
+            <button id="begin-test" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
+                Begin Tests
+            </button>
+            <div id="myGrid" class="ag-theme-alpine" style="height: 500px"></div>
+        </div>
+
+        <script>
+            class StatusResultRenderer {
+                eGui;
+
+                // Optional: Params for rendering. The same params that are passed to the cellRenderer function.
+                init(params) {
+                    console.log("JKH1");
+                    if ( params.value == "" || params.value == null) {
+                        this.eGui = document.createElement('span');
+                        return;
+                    }
+
+                    console.log("JKH2");
+                    let icon = document.createElement('img');
+                    icon.src = `https://www.ag-grid.com/example-assets/icons/${
+                        (params.value == "1") ? 'tick-in-circle' : 'cross-in-circle'
+                    }.png`;
+                    icon.setAttribute('class', 'StatusIcon');
+
+                    this.eGui = document.createElement('span');
+                    this.eGui.setAttribute('class', 'statusSpan');
+                    this.eGui.appendChild(icon);
+                }
+
+                // Required: Return the DOM element of the component, this is what the grid puts into the cell
+                getGui() {
+                    return this.eGui;
+                }
+
+                // Required: Get the cell to refresh.
+                refresh(params) {
+                    return false;
+                }
+            }
+
+            let gridAPI;
+            let testData = undefined;
+
+            $(document).ready(function () {
+                const llmOptions = [
+                    { 'text': 'Anthropic 1', 'value': 1, 'flowIdentifier': '7LOTB2NAV9', 'flowAlias': 'IGJH57P4CT' },
+                    { 'text': 'Anthropic 2', 'value': 2, 'flowIdentifier': '7LOTB2NAV9', 'flowAlias': 'IGJH57P4CT' },
+                    { 'text': 'Anthropic 3', 'value': 3, 'flowIdentifier': '7LOTB2NAV9', 'flowAlias': 'IGJH57P4CT' },
+                ];
+
+                const $select = $('#llm-select');
+                llmOptions.forEach((option) => {
+                    $select.append($('<option>', {
+                        value: option.value,
+                        text: option.text,
+                        'data-flow-identifier': option.flowIdentifier,
+                        'data-flow-alias': option.flowAlias,
+                    }));
+                });
+
+                $('#begin-test').on('click', function () {
+                    beginTest();
+                });
+
+                function beginTest() {
+                    const selectedOption = $('#llm-select option:selected');
+                    const value = selectedOption.val();
+                    const flowIdentifier = selectedOption.data('flow-identifier');
+                    const flowAlias = selectedOption.data('flow-alias');
+
+                    if (value) {
+                        console.log(`Beginning test for LLM ${value}`);
+                        console.log(`Flow Identifier: ${flowIdentifier}`);
+                        console.log(`Flow Alias: ${flowAlias}`);
+                        console.log(testData);
+                        testData.forEach((test) => {
+                            test.status = Math.random() < 0.5 ? "0" : "1"; 
+                        });
+                        gridApi.setGridOption('rowData', testData);
+                    } else {
+                        Swal.fire('Error', 'Please select an LLM', 'error');
+                        return;
+                    }
+                }
+
+                const gridOptions = {
+                    columnDefs: [
+                        { headerName: 'Id', field: 'id', minWidth: 50 },
+                        { headerName: 'Status', field: 'status', minWidth: 100, cellRenderer: StatusResultRenderer  },
+                        { headerName: 'Question', field: 'question', minWidth: 450 },
+                        { headerName: 'MySQL', field: 'mysql', minWidth: 500 },
+                        { headerName: 'Response', field: 'response', maxWidth: 150 },
+                    ],
+                    rowData: [],
+                };
+                // Your Javascript code to create the Data Grid
+                const myGridElement = document.querySelector('#myGrid');
+                gridApi = agGrid.createGrid(myGridElement, gridOptions);
+                fetch('/test-api')
+                    .then((response) => response.json())
+                    .then((data) => {
+                        testData = data;
+                        gridApi.setGridOption('rowData', testData);
+                    });
+            });
+        </script>
+    </body>
+</html>
