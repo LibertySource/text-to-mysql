@@ -179,7 +179,6 @@
                         data: JSON.stringify(data),
                         success: function (response) {
                             // Assuming the response contains SQL
-                            debugger
                             $("#sqlOutput").val(response.mysql);
                             displayDBResults(response.dbResult);
                         },

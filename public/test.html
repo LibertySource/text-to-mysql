@@ -45,16 +45,14 @@
 
                 // Optional: Params for rendering. The same params that are passed to the cellRenderer function.
                 init(params) {
-                    console.log("JKH1");
-                    if ( params.value == "" || params.value == null) {
+                    if (params.value == '' || params.value == null) {
                         this.eGui = document.createElement('span');
                         return;
                     }
 
-                    console.log("JKH2");
                     let icon = document.createElement('img');
                     icon.src = `https://www.ag-grid.com/example-assets/icons/${
-                        (params.value == "1") ? 'tick-in-circle' : 'cross-in-circle'
+                        (params.value == '1') ? 'tick-in-circle' : 'cross-in-circle'
                     }.png`;
                     icon.setAttribute('class', 'StatusIcon');
 
@@ -110,7 +108,7 @@
                         console.log(`Flow Alias: ${flowAlias}`);
                         console.log(testData);
                         testData.forEach((test) => {
-                            test.status = Math.random() < 0.5 ? "0" : "1"; 
+                            test.status = Math.random() < 0.5 ? '0' : '1';
                         });
                         gridApi.setGridOption('rowData', testData);
                     } else {
@@ -122,7 +120,7 @@
                 const gridOptions = {
                     columnDefs: [
                         { headerName: 'Id', field: 'id', minWidth: 50 },
-                        { headerName: 'Status', field: 'status', minWidth: 100, cellRenderer: StatusResultRenderer  },
+                        { headerName: 'Status', field: 'status', minWidth: 100, cellRenderer: StatusResultRenderer },
                         { headerName: 'Question', field: 'question', minWidth: 450 },
                         { headerName: 'MySQL', field: 'mysql', minWidth: 500 },
                         { headerName: 'Response', field: 'response', maxWidth: 150 },
