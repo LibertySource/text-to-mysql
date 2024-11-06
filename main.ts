@@ -1,10 +1,8 @@
-/*
-  ___ __  __ ___  ___  ___ _____ ___
- |_ _|  \/  | _ \/ _ \| _ \_   _/ __|
-  | || |\/| |  _/ (_) |   / | | \__ \
- |___|_|  |_|_|  \___/|_|_\ |_| |___/
-
-*/
+//////////////////////////////////////////
+//                                      //
+//          📦 I M P O R T S            //
+//                                      //
+//////////////////////////////////////////
 
 import { Application } from 'https://deno.land/x/oak/mod.ts';
 import { Client } from 'https://deno.land/x/mysql/mod.ts';
@@ -12,13 +10,11 @@ import { Router } from 'https://deno.land/x/oak/mod.ts';
 import { BedrockAgentRuntimeClient, InvokeFlowCommand } from 'npm:@aws-sdk/client-bedrock-agent-runtime';
 import { bold, gray, white } from 'https://deno.land/std@0.224.0/fmt/colors.ts';
 
-/*
-  ___ _  ___   __ __   ___   ___  ___
- | __| \| \ \ / / \ \ / /_\ | _ \/ __|
- | _|| .` |\ V /   \ V / _ \|   /\__ \
- |___|_|\_| \_/     \_/_/ \_\_|_\|___/
-
-*/
+//////////////////////////////////////////
+//                                      //
+//  ⚙️ E N V I R O N M E N T  V A R S   //
+//                                      //
+//////////////////////////////////////////
 
 // read this first for logging
 const debug: boolean = Deno.env.get('DEBUG')?.toLowerCase() === 'true';
@@ -84,13 +80,11 @@ if (
   Deno.exit(1);
 }
 
-/*
-   ___ ___  _  _ ___ _____ _   _  _ _____ ___
-  / __/ _ \| \| / __|_   _/_\ | \| |_   _/ __|
- | (_| (_) | .` \__ \ | |/ _ \| .` | | | \__ \
- \___\___/|_|\_|___/ |_/_/ \_\_|\_| |_| |___/
-
-*/
+//////////////////////////////////////////
+//                                      //
+//      🔒   C O N S T A N T S          //
+//                                      //
+//////////////////////////////////////////
 
 const app = new Application();
 
@@ -112,16 +106,12 @@ const db_client = await new Client().connect({
 
 const router = new Router();
 
-/*
-  _    ___   ___   _   _
- | |  / _ \ / __| /_\ | |
- | |_| (_) | (__ / _ \| |__
- |____\___/ \___/_/_\_\____|___ ___  _  _ ___
- | __| | | | \| |/ __|_   _|_ _/ _ \| \| / __|
- | _|| |_| | .` | (__  | |  | | (_) | .` \__ \
- |_|  \___/|_|\_|\___| |_| |___\___/|_|\_|___/
 
-*/
+//////////////////////////////////////////
+//                                      //
+//  🧩  L O C A L   F U N C T I O N S   //
+//                                      //
+//////////////////////////////////////////
 
 function getAIStatus(sql: string) {
   return sql.toUpperCase().startsWith('ERROR') ? false : true;
@@ -153,7 +143,6 @@ async function getQuestionRows() {
         mysql, 
         response
       FROM ??
-      WHERE mysql IS NOT NULL 
       ORDER BY sortOrder; 
       `,
     ['Question'],
@@ -281,13 +270,11 @@ async function runSQL(mysql: string) {
   }
 }
 
-/*
-  ___  ___  _   _ _____ ___ ___
- | _ \/ _ \| | | |_   _| __/ __|
- |   / (_) | |_| | | | | _|\__ \
- |_|_\\___/ \___/  |_| |___|___/
-
-*/
+//////////////////////////////////////////
+//                                      //
+//         🧭  R O U T E S              //
+//                                      //
+//////////////////////////////////////////
 
 // Default route, serves static HTML page index.html
 app.use(async (ctx, next) => {
@@ -376,13 +363,11 @@ router.post('/sql', async (ctx) => {
   ctx.response.body = { dbResult: result, success };
 });
 
-/*
-  ___ _            _
- / __| |_ __ _ _ _| |_
- \__ \  _/ _` | '_|  _|
- |___/\__\__,_|_|  \__|
-
-*/
+//////////////////////////////////////////
+//                                      //
+//           🚀  S T A R T              //
+//                                      //
+//////////////////////////////////////////
 
 // Add router middleware
 app.use(router.routes());
