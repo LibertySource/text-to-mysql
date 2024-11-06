@@ -52,11 +52,12 @@ CREATE TABLE IF NOT EXISTS AuditLog (
 )
 engine=innodb;
 
-CREATE TABLE IF NOT EXISTS Questions (
+CREATE TABLE IF NOT EXISTS Question (
   id INT AUTO_INCREMENT PRIMARY KEY,
   sortOrder INT,
   question VARCHAR(500),
   isValid BOOLEAN,
-  answer TEXT
+  mysql TEXT,
+  response TEXT
 )
 engine=innodb;
